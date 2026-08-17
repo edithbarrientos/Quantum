@@ -1,37 +1,64 @@
-from flask import Blueprint, request, jsonify
+import os
+import sys
+import datetime
+from flask import Blueprint, request, jsonify, Response
+
+try:
+    import jwt
+except ImportError:
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT==2.10.1"])
+    import jwt
+
 from src.quantum_engine import ejecutar_circuito_cuantico, np
 
-# Instanciamos el Blueprint para modularizar las rutas cuánticas de la app
 quantum_bp = Blueprint('quantum', __name__)
 
-@quantum_bp.route("/", methods=["GET"])
-def home():
-    return jsonify({
-        "status": "online", 
-        "architecture": "Modular Factory Pattern",
-        "environment": "Docker Container (Linux)",
-        "backend": "Gunicorn Puro (WSGI)", 
-        "quantum_simulator": "Local (default.qubit)"
-    })
+# Recuperamos ambas llaves de la memoria RAM del contenedor de forma dinámica
+JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "mi-llave-secreta-jwt-2026")
+VALOR_PASSWORD_VALIDO = os.environ.get("AUTH_PASSWORD", "")
+
+@quantum_bp.route("/api/v1/auth/login", methods=["POST"])
+def login() -> Response:
+    datos = request.get_json() or {}
+    usuario = datos.get("usuario")
+    contrasena = datos.get("contrasena")
+    
+    # 🔐 PROTOCOLO SEGURO: Compara contra la variable inyectada desde el Secret
+    if usuario == "desarrollador-cuantico" and contrasena == VALOR_PASSWORD_VALIDO:
+        payload = {
+            "sub": usuario,
+            "role": "quantum_engineer",
+            "iat": datetime.datetime.utcnow(),
+            "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=15)
+        }
+        token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+        return jsonify({"token_acceso_jwt": token}), 200
+    return jsonify({"error": "Credenciales invalidas"}), 401
 
 @quantum_bp.route("/api/v1/quantum/procesar", methods=["POST"])
-def procesar_matrices_cuanticas():
+def procesar_matrices_cuanticas() -> Response:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Falta el token Bearer"}), 401
+    token = auth_header.split(" ")[1]
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return jsonify({"error": "Token expirado"}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({"error": "Token invalido"}), 401
+        
     datos = request.get_json() or {}
-    
     id_solicitud = datos.get("id_solicitud", "SINFIRM")
     angulo_grados = float(datos.get("angulo_grados", 0.0))
-    
-    # Conversión matemática clásica a radianes para alimentar las compuertas
     radianes = (angulo_grados * np.pi) / 180.0
-    
-    # Invocamos al procesador cuántico local pasándole el parámetro clásico
     resultado_probabilidades = ejecutar_circuito_cuantico(radianes)
-    
     estados = ["00", "01", "10", "11"]
     distribucion = {estados[i]: f"{float(resultado_probabilidades[i])*100:.2f}%" for i in range(4)}
-    
     return jsonify({
         "id_solicitud": id_solicitud,
+        "operador_autorizado": payload["sub"],
         "angulo_procesado_rad": round(radianes, 4),
         "distribucion_de_probabilidad": distribucion,
         "estado_mas_probable": estados[np.argmax(resultado_probabilidades)]

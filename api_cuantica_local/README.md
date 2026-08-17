@@ -1,74 +1,99 @@
-# 🌐 API Cuántica Local - Microservicio Híbrido (QaaS)
+# ⚛️ API Cuántica Local Contenerizada - Arquitectura Segura en Kubernetes con JWT
 
-Este proyecto implementa una **Arquitectura de Software Híbrida Clásico-Cuántica** utilizando el patrón de diseño *Quantum-As-A-Service (QaaS)*. El microservicio está construido con **Flask**, administrado por procesos de producción de **Gunicorn (WSGI)** y encapsulado dentro de un contenedor **Docker** bajo una red aislada de tipo puente (*bridge*). 
+## 🎯 Objetivo de la Prueba de Concepto (PoC)
+El objetivo de esta Prueba de Concepto es **validar la integración, gobernanza y blindaje criptográfico de algoritmos cuánticos parametrizados dentro de una arquitectura de microservicios corporativa**. 
 
-El motor de cómputo cuántico utiliza el simulador local de vectores de estado de **PennyLane (Xanadu)**, ejecutándose de forma 100% local en los hilos del procesador sin tocar conexiones externas.
+Esta infraestructura demuestra cómo una Unidad de Procesamiento Cuántico (QPU) —simulada localmente de forma offline— opera como un coprocesador acelerador asíncrono y desacoplado. Se establecen las bases de **Quantum-As-A-Service (QaaS)** mediante el empaquetado en contenedores Linux, garantizando alta disponibilidad a través de la orquestación en Kubernetes (Colima) y eliminando las malas prácticas de credenciales hardcodeadas mediante la inyección en caliente de **Kubernetes Secrets** y la validación stateless con **JSON Web Tokens (JWT)**.
 
 ---
 
-## 🗺️ Arquitectura del Sistema e Infraestructura de Red
-La API está diseñada para desacoplar el servidor web clásico del procesamiento de álgebra lineal cuántica, garantizando que el sistema operativo no congele los hilos de ejecución de las matrices complejas.
+## 🗺️ 1. Diagrama Arquitectónico por Capas (Multi-Tier Architecture)
+
+La infraestructura se divide estrictamente en 4 capas de abstracción para aislar las responsabilidades de red, gobernanza, lógica web y procesamiento físico matricial:
 
 ```text
-  [ CLIENTE / MAC LOCAL ] (Petición HTTP vía Curl)
-             │  
-             │ POST http://localhost:5000/api/v1/quantum/procesar
-             ▼
-  ┌────────────────────────────────────────────────────────┐
-  │         CONTENEDOR DOCKER (Entorno Linux Aislado)      │
-  ├────────────────────────────────────────────────────────┤
-  │  • Red Puente: red_cuantica_puente                    │
-  │  • Servidor Web: Gunicorn (WSGI Standard)              │
-  │  • Puerto Seguro: 5000 (Completamente alejado del 80)  │
-  │                                                        │
-  │  ┌───────────────┐      Instancia en Memoria           │
-  │  │   src/routes  │ ───► (Valida JSON Clásico)          │
-  │  └───────┬───────┘                                     │
-  │          │                                             │
-  │          ▼                                             │
-  │  ┌───────────────┐      Cálculo Numérico Local         │
-  │  │ src/quantum_  │ ───► (Simulador default.qubit)      │
-  │  │    engine     │      Genera Estados de Bell de 2Q   │
-  │  └───────────────┘                                     │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-                           ▼ Devuelve Inferencia JSON
-  [ CLIENTE / MAC LOCAL ] (Muestra Distribución de Probabilidades)
+========================================================================================
+ CAPA 1: RED INTERNA / PERÍMETRO PÚBLICO (Frontera de Entrada Clásica)
+========================================================================================
+  [ CLIENTE / CURL ] ────( HTTP POST /api/v1/... )────► [ PUERTO LOCAL 9000 ]
+                                                                 │
+                                    Mapea mediante Port-Forward  │
+                                                                 ▼
+========================================================================================
+ CAPA 2: GOBERNANZA E INFRAESTRUCTURA DE RED (Service Mesh & Ingress Native Layer)
+========================================================================================
+  ┌──────────────────────────────────────────────────────────────────────────────────┐
+  │ ☸️ KUBERNETES INGRESS CONTROLLER (Frontera de Control Local - Plano de Datos)    │
+  │  • Intercepta las llamadas del puerto seguro 9000 sin tocar la IP de la Mac.     │
+  │  • Actúa como el balanceador primario de la red virtual del clúster.             │
+  └────────────────────────────────────────┬─────────────────────────────────────────┘
+                                           │ Enrutamiento Interno Inmune a Firewalls
+                                           ▼
+========================================================================================
+ CAPA 3: SERVICIOS, AUTENTICACIÓN Y DISPONIBILIDAD (Container Web App Layer)
+========================================================================================
+  ┌──────────────────────────────────────────────────────────────────────────────────┐
+  │ ☸️ KUBERNETES DEPLOYMENT BALANCER (api-cuantica-service:5000)                    │
+  │  • Distribuye el payload balanceando la carga entre las 2 réplicas activas.      │
+  └─────────────────────┬──────────────────────────────────────┬─────────────────────┘
+                        │ (Balanceo Round-Robin Nativo)        │
+                        ▼                                      ▼
+           ┌──────────────────────────┐           ┌──────────────────────────┐
+           │   📦 POD 01 (Gunicorn)   │           │   📦 POD 02 (Gunicorn)   │
+           ├──────────────────────────┤           ├──────────────────────────┤
+           │ • Valida Firma JWT       │           │ • Valida Firma JWT       │
+           │ • Lee Secretos en RAM    │           │ • Lee Secretos en RAM    │
+           └────────────┬─────────────┘           └────────────┬─────────────┘
+                        │                                      │
+========================================================================================
+ CAPA 4: CO-PROCESAMIENTO ACELERADOR (Quantum Core Compute Layer)
+========================================================================================
+                        │ Inyecta Escalar Real (Radianes)      │
+                        ▼                                      ▼
+           ┌──────────────────────────┐           ┌──────────────────────────┐
+           │  PENNYLANE SIMULATOR     │           │  PENNYLANE SIMULATOR     │
+           │  (default.qubit 2Q)      │           │  (default.qubit 2Q)      │
+           │  Altera e^-iθ y matrices │           │  Altera e^-iθ y matrices │
+           └──────────────────────────┘           └──────────────────────────┘
 ```
 
 ---
 
-## 📁 Estructura Modular del Proyecto
-El código implementa el **Factory Pattern** (Fábrica de Aplicaciones) y **Flask Blueprints** para aislar las responsabilidades de red de la lógica física cuántica:
+## 📥 2. Especificación de Contratos de Endpoints (API Contract)
 
-```text
-api_cuantica_local/
-│
-├── requirements.txt        # Dependencias rígidas (pennylane, flask, gunicorn, numpy)
-├── Dockerfile              # Plano de compilación para entornos Linux de producción
-├── run.py                  # Punto de entrada minimalista del servidor
-└── src/                    # Módulo principal del código fuente
-    ├── __init__.py         # Inicializador y fábrica del microservicio (App Factory)
-    ├── routes.py           # Capa de Red: Controladores, endpoints HTTP y parsing JSON
-    └── quantum_engine.py   # Capa Lógica: Hardware virtual y circuitos parametrizados
-```
-
----
-
-## 📥 Especificación del Endpoint (API Contract)
-
-### **POST** `/api/v1/quantum/procesar`
-Recibe un parámetro clásico en grados y calcula el entrelazamiento y colapso de fases en la Esfera de Bloch.
+### **A. Intercambio de Credenciales (Login)**
+### **POST** `/api/v1/auth/login`
+Valida las identidades contra la contraseña inyectada en caliente desde la bóveda de secretos y emite un token firmado criptográficamente válido por 15 minutos.
 
 * **Payload de Entrada (JSON):**
 ```json
 {
-  "id_solicitud": "PRODUCCION-DOCKER-OK",
-  "angulo_grados": 90.0
+  "usuario": "desarrollador-cuantico",
+  "contrasena": "password123"
+}
+```
+* **Respuesta del Servidor (200 OK):**
+```json
+{
+  "token_acceso_jwt": "eyJhbGciOiJIUzI1NiIsInR5..."
 }
 ```
 
-* **Respuesta del Servidor (JSON):**
+---
+
+### **B. Procesamiento del Circuito Cuántico**
+### **POST** `/api/v1/quantum/procesar`
+Exige el token JWT emitido dentro de la cabecera estándar de autorización. Recibe un parámetro en grados sexagesimales clásicos, los transforma a radianes e induce un entrelazamiento de partículas en la Esfera de Bloch.
+
+* **Cabecera Requerida:** `Authorization: Bearer <TU_JWT>`
+* **Payload de Entrada (JSON):**
+```json
+{
+  "id_solicitud": "PROD-JWT-VERIFICADO-OK",
+  "angulo_grados": 90.0
+}
+```
+* **Respuesta del Servidor (200 OK):**
 ```json
 {
   "angulo_procesado_rad": 1.5708,
@@ -79,32 +104,86 @@ Recibe un parámetro clásico en grados y calcula el entrelazamiento y colapso d
     "11": "50.00%"
   },
   "estado_mas_probable": "00",
-  "id_solicitud": "PRODUCCION-DOCKER-OK"
+  "id_solicitud": "PROD-JWT-VERIFICADO-OK",
+  "operador_autorizado": "desarrollador-cuantico"
 }
 ```
-*Nota: Al inyectar un ángulo de 90° ($\pi/2$ rad) seguido de un entrelazamiento CNOT, el circuito genera un Estado de Bell de correlación máxima, forzando a los cúbits mixtos (`01` y `10`) a colapsar a 0% de probabilidad.*
+
+## ⚛️ 3. Plano Técnico del Circuito Cuántico (Circuito de Bell Parametrizado)
+
+Este es el esquema de compuertas lógicas cuánticas que se ejecuta de forma síncrona en la memoria RAM del contenedor al pasar la barrera del JWT:
+
+```text
+               📥 ENTRADA                ⚙️ PROCESAMIENTO                📤 SALIDA
+        (Estado Base Clásico)      (Superposición / Rotación)     (Colapso Probabilístico)
+
+           |0⟩ ───────────────[ H ]───────────[ RX(θ) ]───────■───────────[ M ]───► 50% |00⟩
+                                                              │
+
+           |0⟩ ───────────────────────────────────────────────X───────────[ M ]───► 50% |11⟩
+                                                                            
+                                                            [CNOT]
+                                                    (Control: Q0 / Target: Q1)
+```
+* *Nota Física:* Al alimentar al motor con 90° (π/2 rad) seguido de una interacción de espín mediante una compuerta `CNOT`, las amplitudes de probabilidad colapsan en un **Estado de Bell de correlación máxima**, provocando un entrelazamiento cuántico puro donde los estados mixtos (`01` y `10`) tienen un 0% absoluto de probabilidad de manifestarse.
 
 ---
 
-## 🚀 Despliegue y Orquestación Local
-Para levantar el orquestador de contenedores (asegúrate de tener **Colima** o tu daemon de Docker activo) y montar la red puente aislada, ejecuta en tu terminal:
+## 📁 Estructura General del Repositorio
+El código fuente de la aplicación web y los Hamiltonianos de simulación física cuántica se encuentran estrictamente desacoplados de los manifiestos de orquestación de infraestructura, utilizando `ConfigMaps` para montar la lógica caliente de red:
 
-```bash
-# 1. Crear la red puente de forma explícita
-docker network create --driver bridge red_cuantica_puente
-
-# 2. Compilar la imagen de la API modular
-docker build -t api-cuantica-modular-img .
-
-# 3. Lanzar el contenedor en segundo plano amarrado a la red
-docker run -d --name api-cuantica-contenedor --network red_cuantica_puente -p 5000:5000 api-cuantica-modular-img
+```text
+api_cuantica_local/
+│
+├── requirements.txt         # Dependencias rígidas de producción (Flask, PennyLane, Gunicorn, PyJWT)
+├── Dockerfile               # Instrucciones de empaquetado optimizadas con caché de capas
+├── run.py                   # Punto de entrada minimalista del servidor Gunicorn WSGI
+├── README.md                # Documentación técnica del portafolio (Este archivo)
+│
+├── src/                     # CÓDIGO FUENTE ULTRA-DOCUMENTADO
+│   ├── __init__.py          # Fábrica de Aplicaciones (App Factory Pattern)
+│   ├── routes.py            # Capa de Red: Validación Stateless JWT y Type Hinting
+│   └── quantum_engine.py    # Capa Lógica: Hardware virtual y circuitos parametrizados
+│
+└── k8s_infra/               # CAPA DE INFRAESTRUCTURA Y DEVSECOPS OFFLINE
+    ├── 01-infraestructura.yaml    # Deployment (Volúmenes en caliente) y Service balanceador
+    ├── 02-secrets.yaml            # 🔐 Bóveda Opaque con firmas y passwords cifrados en Base64
+    └── 03-routes-config.yaml      # ConfigMap con inyección dinámica de código en RAM
 ```
 
-## 📡 Pruebas de Humo (Testing de Endpoints)
-Puedes interrogar localmente a tu procesador cuántico contenerizado ejecutando el comando de red clásico:
+---
+
+## 🚀 Secuencia de Orquestación y Pruebas Locales (Modo Offline)
+
+Para levantar la infraestructura de forma segura en tu entorno local con **Colima** limpiando sockets de memoria previos, sigue esta secuencia ordenada:
 
 ```bash
-curl -X POST http://localhost:5000/api/v1/quantum/procesar \
+# 1. Compilar la imagen base bajo el kernel del clúster
+export DOCKER_HOST="unix://\$HOME/.colima/default/docker.sock"
+docker build -t api-cuantica-modular-img:latest .
+
+# 2. Lanzar la orquestación masiva de infraestructura y secretos de estado
+kubectl apply -f k8s_infra/
+
+# 3. Mitigación DevOps: Forzar recreación destructiva para limpiar hilos de memoria
+kubectl delete pods -l app=api-cuantica
+kill -9 \$(lsof -t -i:9000) 2>/dev/null || true
+
+# 4. Abrir el puente de red virtual entre la Mac y el clúster
+kubectl port-forward service/api-cuantica-service 9000:5000
+```
+
+### 📡 Pruebas de Humo de Extremo a Extremo (E2E Tests)
+1. **Paso A: Obtención del JWT Firmado:**
+```bash
+curl -s -X POST http://localhost:9000/api/v1/auth/login \
      -H "Content-Type: application/json" \
-     -d '{"id_solicitud": "TEST-CI-CD", "angulo_grados": 90.0}'
+     -d '{"usuario": "desarrollador-cuantico", "contrasena": "password123"}'
+```
+2. **Paso B: Consumo del Circuito Cuántico:** Envíe el token resultante en la cabecera `Authorization`:
+```bash
+curl -i -X POST http://localhost:9000/api/v1/quantum/procesar \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <COPIA_AQUÍ_EL_JWT>" \
+     -d '{"id_solicitud": "E2E-JWT-OK", "angulo_grados": 90.0}'
 ```

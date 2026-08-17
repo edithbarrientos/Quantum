@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-cuantica-gateway-ingress
+  namespace: default
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /api/v1/quantum/procesar
+        pathType: Prefix
+        backend:
+          service:
+            name: api-cuantica-service
+            port:
+              number: 5000
