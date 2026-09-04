@@ -8,8 +8,9 @@ import os
 import time
 import uuid
 import logging
-from flask import Blueprint, request, jsonify, Response, current_app
-from src.crypto_engine.factory import FabricaCriptograficaPQC
+from flask import Blueprint, request, jsonify, Response
+from src.crypto_engine import FabricaCriptograficaPQC
+from src.ai_engine import proteger_con_ia
 
 logger = logging.getLogger("QuantumImmuneCrypto")
 mesh_bp = Blueprint('mesh', __name__)
@@ -17,12 +18,13 @@ mesh_bp = Blueprint('mesh', __name__)
 VERSION_MALLA = os.environ.get("MESH_VERSION", "v1")
 ENTORNO_MALLA = os.environ.get("MESH_ENVIRONMENT", "PROD")
 
+
 @mesh_bp.route("/api/v1/mesh/auth/keygen", methods=["POST"])
 def generar_credenciales_pqc() -> Response:
     correlation_id = str(uuid.uuid4())
     logger.info(f"📥 [APIM] [{correlation_id}] Solicitud de generación de llaves PQC recibida.")
     try:
-        # ⚡ DETALLE CORREGIDO: Invocación en español exacta alineada a factory.py
+        # Inferencia limpia y nativa gracias a la estructura Unión de factory.py
         motor_pqc = FabricaCriptograficaPQC.obtener_motor_pqc_configurado()
         credenciales = motor_pqc.generar_par_llaves()
         credenciales["correlation_id"] = correlation_id
@@ -33,26 +35,19 @@ def generar_credenciales_pqc() -> Response:
         logger.error(f"❌ [APIM] [{correlation_id}] Fallo crítico en KeyGen: {str(e)}")
         return jsonify({"error": "Fallo interno en la factoría", "correlation_id": correlation_id}), 500
 
+
 @mesh_bp.route("/api/v1/mesh/quantum/procesar", methods=["POST"])
+@proteger_con_ia()  # 🛡️ Cortafuegos cognitivo IA activo: Filtra amenazas antes de la criptografía pesada
 def interceptar_y_procesar_trafico() -> Response:
     correlation_id = str(uuid.uuid4())
     tiempo_inicio = time.time()
     datos = request.get_json() or {}
     logger.info(f"📥 [APIM] [{correlation_id}] Interceptando payload perimetral.")
 
-    tamano_payload = len(str(datos))
-    velocidad_burst = int(request.headers.get("X-Burst-Rate", "1"))
-    token_bearer = request.headers.get("Authorization", "")
-    entropia_token = float(len(token_bearer)) / 100.0 if token_bearer else 0.0
-
-    detector_ia = current_app.config["AI_DETECTOR"]
-    analisis_riesgo = detector_ia.evaluar_trafico_perimetral(tamano_payload, velocidad_burst, entropia_token)
-
-    if analisis_riesgo["detección_anomalia"] and analisis_riesgo["estrategia_mitigacion_sugerida"] == "CRITICAL_LOCKOUT":
-        return jsonify({"error": "Rechazado por firewall cognitivo IA", "correlation_id": correlation_id}), 403
+    # Recuperamos de manera segura el análisis de riesgo inyectado por el decorador
+    analisis_riesgo = getattr(request, "analisis_riesgo_ia", {"detección_anomalia": False, "status": "NO_EVALUATED"})
 
     try:
-        # ⚡ DETALLE CORREGIDO: Invocación en español exacta alineada a factory.py
         motor_pqc = FabricaCriptograficaPQC.obtener_motor_pqc_configurado()
         angulo_grados = float(datos.get("angulo_grados", 0.0))
         texto_plano_datos = f"id:{correlation_id}|angulo:{angulo_grados}".encode('utf-8')

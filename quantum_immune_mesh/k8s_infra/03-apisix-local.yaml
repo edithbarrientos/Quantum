@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # 🎯 REFRESH CRÍTICO FINAL: Forzamos la v24 elástica pura para purgar CoreDNS
+  name: apisix-isolated-config-v24
+  namespace: default
+data:
+  config.yaml: |
+    deployment:
+      role: data_plane
+      role_data_plane:
+        config_provider: yaml
+    apisix:
+      node_listen: 9080
+      custom_shared_dicts:
+        plugin-skywalking: 15m
+        tracing-metadata: 15m
+    plugins:
+      - real-ip
+      - proxy-rewrite
+      - response-rewrite
+      - cors
+      - prometheus
+      - skywalking
+      - limit-req
+    plugin_attr:
+      skywalking:
+        service_name: "quantum-apisix-gateway"
+        service_instance_name: "apisix-instance"
+        endpoint_addr: "http://skywalking-oap.observability:12800"
+    nginx_config:
+      worker_processes: 1
+      error_log: "/dev/stdout"
+      error_log_level: "warn"
+      http_configuration: |
+        lua_shared_dict prometheus-cache 5m;
+        lua_shared_dict plugin-limit-req 10m;
+        lua_shared_dict plugin-limit-count 10m;
+        # 🎯 RESOLVEDOR OPTIMIZADO: Buscador local de K3s con refresco agresivo de 1s
+        resolver 10.43.0.10 valid=1s ipv6=off;
+
+  apisix.yaml: |
+    _format_version: 3.0
+    routes:
+      - id: "1"
+        uris:
+          - "/*"
+          - "/api/v1/mesh/quantum/*"
+          - "/api/v1/mesh/quantum/procesar"
+        plugins:
+          skywalking:
+            sample_ratio: 1
+          limit-req:
+            rate: 15
+            burst: 5
+            key: "remote_addr"
+            rejected_code: 503
+        upstream:
+          type: "roundrobin"
+          nodes:
+            # 🎯 NOMBRE CORTO ELÁSTICO: Evita choques de parsing en el cliente DNS de Lua
+            "q-immune-mesh-service:5000": 1
+    upstreams: []
+    consumers: []
+    consumer_groups: []
+    plugin_configs: []
+    secrets: []
+    global_rules: []
+    #END
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apisix-quantum-gateway
+  namespace: default
+  labels:
+    app: apisix-quantum-gateway
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: apisix-quantum-gateway
+  template:
+    metadata:
+      labels:
+        app: apisix-quantum-gateway
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+      - name: setup-config
+        image: apache/apisix:3.17.0-debian
+        command:
+        - sh
+        - -c
+        - |
+          cp /tmp/custom_conf/config.yaml /tmp/shared_conf/config.yaml
+          cp /tmp/custom_conf/apisix.yaml /tmp/shared_conf/apisix.yaml
+        volumeMounts:
+        - name: raw-config-volume
+          mountPath: /tmp/custom_conf
+        - name: shared-conf-dir
+          mountPath: /tmp/shared_conf
+      containers:
+      - name: apisix
+        image: apache/apisix:3.17.0-debian
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          runAsUser: 0
+        env:
+          - name: APISIX_STANDALONE
+            value: "true"
+        ports:
+        - containerPort: 9080
+          name: gateway
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - sh
+              - -c
+              - |
+                cp /tmp/shared_conf/config.yaml /usr/local/apisix/conf/config.yaml
+                cp /tmp/shared_conf/apisix.yaml /usr/local/apisix/conf/apisix.yaml
+        volumeMounts:
+        - name: shared-conf-dir
+          mountPath: /tmp/shared_conf
+      volumes:
+      - name: raw-config-volume
+        configMap:
+          name: apisix-isolated-config-v24 # 🎯 Vinculamos la v24 definitiva
+      - name: shared-conf-dir
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apisix-service
+  namespace: default
+spec:
+  selector:
+    app: apisix-quantum-gateway
+  ports:
+  - name: gateway-http
+    protocol: TCP
+    port: 9080
+    targetPort: 9080
+  type: ClusterIP

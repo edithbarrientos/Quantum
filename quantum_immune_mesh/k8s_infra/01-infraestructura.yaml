@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: q-immune-mesh-deployment
+  namespace: default
+  labels:
+    app: q-immune-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: q-immune-mesh
+  template:
+    metadata:
+      labels:
+        app: q-immune-mesh
+    spec:
+      containers:
+      - name: quantum-api
+        image: q-immune-mesh-img:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000
+          name: api-port
+        env:
+        - name: SW_AGENT_NAME
+          value: "quantum-immune-api"
+        - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+          value: "http://cluster.local"
+        - name: OPENBLAS_NUM_THREADS
+          value: "1"
+        - name: MKL_NUM_THREADS
+          value: "1"
+        - name: OMP_NUM_THREADS
+          value: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: q-immune-mesh-service
+  namespace: default
+spec:
+  selector:
+    app: q-immune-mesh
+  ports:
+  - name: http
+    protocol: TCP
+    port: 5000
+    targetPort: 5000
+  type: ClusterIP

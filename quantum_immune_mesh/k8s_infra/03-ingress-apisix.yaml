@@ -1,0 +1,40 @@
+# ==============================================================================
+# 🌐 INGRESS NATIVO K8S: TRADUCCIÓN AUTOMÁTICA DE RUTAS PARA APISIX v3
+# ==============================================================================
+# Este manifiesto utiliza el estándar oficial de Kubernetes para inyectar la 
+# ruta dentro de APISIX, saltándose la necesidad de instalar CRDs complejos.
+# ==============================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: q-immune-mesh-ingress
+  namespace: default
+  annotations:
+    # 🔑 ANOTACIÓN CRÍTICA: Le indica al controlador de APISIX que debe leer este objeto
+    kubernetes.io/ingress.class: "apisix"
+    
+    # 🔄 Habilita la reescritura de URIs dinámicas profundas hacia el backend
+    apisix.apache.org/plugin-proxy-rewrite: |
+      regex_uri: ["^/api/v1/mesh/quantum/(.*)", "/api/v1/mesh/quantum/$1"]
+spec:
+  rules:
+  - http:
+      paths:
+        # 🎯 CAPTURA DINÁMICA: Intercepta la raíz y subrutas de procesamiento cuántico
+      - path: /api/v1/mesh/quantum
+        pathType: Prefix
+        backend:
+          service:
+            # 🔌 Redirige el tráfico directo al puerto 5000 de tu API de Python
+            name: q-immune-mesh-service
+            port:
+              number: 5000
+        # 🛡️ CAPTURA UNIVERSAL: Respaldo para procesar llamadas directas desde la raíz
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: q-immune-mesh-service
+            port:
+              number: 5000

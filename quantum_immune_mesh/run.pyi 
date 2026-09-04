@@ -1,0 +1,11 @@
+# run.pyi
+# Firmas de tipos estáticos para que VS Code / Pylance validen las clases del parche
+from types import ModuleType
+from typing import Any
+
+class Command_pb2(ModuleType):
+    Commands: Any
+    Command: Any
+
+class mock_common(ModuleType):
+    Command_pb2: Command_pb2

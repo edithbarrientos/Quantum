@@ -1,0 +1,12 @@
+#yaml_version: v3.0
+routes:
+  - id: 1
+    uris:
+      - "/api/v1/mesh/quantum/*"
+      - "/api/v1/mesh/quantum/**"
+    upstream:
+      nodes:
+        "q-immune-mesh-service:9080": 1
+      type: roundrobin
+# Requerido por el validador de Debian en modo standalone para no colapsar la inicialización
+upstreams: []

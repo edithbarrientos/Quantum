@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: apisix-admin
+  namespace: default
+spec:
+  selector:
+    app.kubernetes.io/name: apisix # Se amarra al pod nativo de APISIX que ya tienes corriendo
+  ports:
+  - name: apisix-admin
+    protocol: TCP
+    port: 9180
+    targetPort: 9180
+  type: ClusterIP

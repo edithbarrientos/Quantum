@@ -1,0 +1,23 @@
+# ==============================================================================
+# 🛣️ ENRUTAMIENTO DINÁMICO RECURSIVO: APISIX CUSTOM ROUTE DEFINITION
+# ==============================================================================
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: q-immune-mesh-route
+  namespace: default
+  labels:
+    architecture.layer: routing
+    project: quantum-immune-mesh
+spec:
+  http:
+    - name: api-quantum-integration
+      match:
+        # 🚀 REGLA DE COINCIDENCIA TRIPLE: Captura endpoints explícitos y recursivos profundos
+        paths:
+          - "/api/v1/mesh/quantum/procesar"
+          - "/api/v1/mesh/quantum/**"
+          - "/**"
+      backends:
+        - serviceName: q-immune-mesh-service
+          servicePort: 5000

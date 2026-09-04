@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skywalking-ui
+  namespace: observability
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # 🎯 Purga total de sockets colgados antes de levantar el nuevo
+  selector:
+    matchLabels:
+      app: skywalking-ui
+  template:
+    metadata:
+      labels:
+        app: skywalking-ui
+    spec:
+      containers:
+      - name: skywalking-ui
+        image: apache/skywalking-ui:9.4.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: ui-port
+        env:
+        # 🎯 EL FIX MAESTRO: Enlazamos la UI al core usando el DNS interno elástico de Kubernetes
+        - name: SW_OAP_ADDRESS
+          value: "http://cluster.local"

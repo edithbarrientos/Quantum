@@ -1,0 +1,9 @@
+deployment:
+  role: standalone
+  admin:
+    allow_admin:
+      - 127.0.0.1/32
+apisix:
+  node_listen: 9080
+plugins:
+  - real-ip
