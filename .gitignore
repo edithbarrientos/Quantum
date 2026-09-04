@@ -1,0 +1,21 @@
+# ==========================================
+# PYTHON (Entornos virtuales y Caché)
+# ==========================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+**/*.py[cod]
+venv/
+**/venv/
+.venv/
+**/.venv/
+
+# ==========================================
+# CONFIGURACIONES Y ARCHIVOS TEMPORALES
+# ==========================================
+.vscode/
+.idea/
+.DS_Store
+*.log
+.env
+.env.local

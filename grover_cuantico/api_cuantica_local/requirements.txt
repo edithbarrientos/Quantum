@@ -1,0 +1,5 @@
+pennylane
+flask
+gunicorn
+numpy
+PyJWT==2.10.1

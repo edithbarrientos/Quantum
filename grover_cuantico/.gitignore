@@ -1,0 +1,15 @@
+# Dependències de Node (JavaScript/React)
+node_modules/
+
+# Entorns virtuals de Python
+.venv/
+env/
+__pycache__/
+
+# Variables d'entorn i contrasenyes
+.env
+.env.local
+
+# Arxius del sistema operatiu o editors
+.DS_Store
+.vscode/s
